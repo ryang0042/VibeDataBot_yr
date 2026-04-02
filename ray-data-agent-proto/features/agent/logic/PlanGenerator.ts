@@ -14,13 +14,21 @@ export class MockPlanGenerator {
             // Check if it's requesting Advanced VDU (like LayoutYOLO or PDF-Extract-Kit)
             const isAdvancedLayout = lowerInput.includes("版面") || lowerInput.includes("pdf-extract-kit") || lowerInput.includes("table") || lowerInput.includes("公式");
 
-            // Extract the actual file path avoiding any Chinese prompt context before it
-            const pdfMatch = userInput.match(/[a-zA-Z0-9_\\-\\.\\/\\\\]+\\.pdf/i);
-            let filePath = pdfMatch ? pdfMatch[0] : "";
-            
-            // 如果用户仅仅是口语测试（如：调用大模型测试一下），没有给路径，则自动挂载一个展示性质的示例预设靶场文档
-            if (!filePath) {
-                filePath = "/Users/lee/Documents/paper/2409.13831v1.pdf";
+            // 优先匹配从目录树点击发送的标准格式 "路径是：/xxx.pdf"，其次匹配带有斜杠的绝对路径，最后退化为单词匹配
+            let filePath = "";
+            const pathIndicatorMatch = userInput.match(/路径.*?(?:[:：]|是\s*[:：]?)\s*(.*?\.pdf)/i);
+            if (pathIndicatorMatch) {
+                filePath = pathIndicatorMatch[1].trim();
+            } else {
+                const pathMatch = userInput.match(/(?:[a-zA-Z]:[/\\]|\/|~\/)[^\n\r"'<>|]*?\.pdf/i);
+                if (pathMatch) {
+                    filePath = pathMatch[0].trim();
+                } else {
+                    const simpleMatch = userInput.match(/[a-zA-Z0-9_\\-\\.\\/\\\\]+\\.pdf/i);
+                    if (simpleMatch) {
+                        filePath = simpleMatch[0].trim();
+                    }
+                }
             }
 
             steps.push({
