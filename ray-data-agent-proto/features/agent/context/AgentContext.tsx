@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import { AgentStatus, ExecutionPlan, AgentMessage } from "../types/AgentTypes";
+import { AgentStatus, ExecutionPlan, AgentMessage, ExecutionProgress } from "../types/AgentTypes";
 
 interface AgentContextType {
     status: AgentStatus;
@@ -17,6 +17,8 @@ interface AgentContextType {
     setPlan: (plan: ExecutionPlan | null) => void;
     updateStepStatus: (stepId: string, status: ExecutionPlan["steps"][0]["status"]) => void;
     updateArtifact: (stepId: string, data: unknown[]) => void;
+    executionProgress: ExecutionProgress | null;
+    setExecutionProgress: React.Dispatch<React.SetStateAction<ExecutionProgress | null>>;
 
     reset: () => void;
 
@@ -42,6 +44,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     const [messages, setMessages] = useState<AgentMessage[]>([]);
     const [logs, setLogs] = useState<string[]>([]);
     const [plan, setPlan] = useState<ExecutionPlan | null>(null);
+    const [executionProgress, setExecutionProgress] = useState<ExecutionProgress | null>(null);
     const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
     const [chatInput, setChatInput] = useState<string>("");
 
@@ -83,6 +86,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         setLogs([]);
         setMessages([]);
         setPlan(null);
+        setExecutionProgress(null);
         setSelectedResource(null);
     };
 
@@ -95,6 +99,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
                 plan, setPlan,
                 updateStepStatus,
                 updateArtifact,
+                executionProgress,
+                setExecutionProgress,
                 reset,
                 selectedResource, setSelectedResource,
                 chatInput, setChatInput

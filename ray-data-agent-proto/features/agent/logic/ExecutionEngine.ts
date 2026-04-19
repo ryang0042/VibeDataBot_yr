@@ -28,18 +28,41 @@ interface ExecutionCallbacks {
     onStepUpdate: (stepId: string, status: "active" | "completed" | "failed") => void;
     onLog: (log: string) => void;
     onArtifact: (stepId: string, data: ExecutionArtifact[]) => void;
+    onProgress: (progress: {
+        stepId: string | null;
+        stepLabel: string;
+        message: string;
+        percent: number;
+        indeterminate?: boolean;
+    } | null) => void;
 }
 
 export class ExecutionEngine {
     static async executePlan(plan: ExecutionPlan, callbacks: ExecutionCallbacks) {
         callbacks.onLog(`🚀 Starting execution of plan: ${plan.id}`);
+        callbacks.onProgress({
+            stepId: null,
+            stepLabel: "Preparing",
+            message: "Queued execution plan and checking prerequisites...",
+            percent: 0,
+        });
 
         // 用于在 Pipeline 级联步骤之间互相传递依赖数据
         const artifactPayloads: Record<string, ExecutionArtifact[]> = {};
+        const totalSteps = Math.max(plan.steps.length, 1);
 
-        for (const step of plan.steps) {
+        for (const [stepIndex, step] of plan.steps.entries()) {
+            const basePercent = Math.round((stepIndex / totalSteps) * 100);
+
             // 1. Mark Running
             callbacks.onStepUpdate(step.id, "active");
+            callbacks.onProgress({
+                stepId: step.id,
+                stepLabel: step.label,
+                message: `Starting ${step.label}...`,
+                percent: basePercent,
+                indeterminate: true,
+            });
             callbacks.onLog(`\n--- [Step: ${step.label}] ---`);
             callbacks.onLog(`Executing: ${step.description}`);
             if (step.codeSnippet) {
@@ -56,14 +79,35 @@ export class ExecutionEngine {
 
                 // 3. Mark Done
                 callbacks.onStepUpdate(step.id, "completed");
+                callbacks.onProgress({
+                    stepId: step.id,
+                    stepLabel: step.label,
+                    message: `${step.label} completed.`,
+                    percent: Math.round(((stepIndex + 1) / totalSteps) * 100),
+                    indeterminate: false,
+                });
             } catch (error) {
                 callbacks.onLog(`❌ Error in step ${step.id}: ${error}`);
                 callbacks.onStepUpdate(step.id, "failed");
+                callbacks.onProgress({
+                    stepId: step.id,
+                    stepLabel: step.label,
+                    message: `${step.label} failed.`,
+                    percent: basePercent,
+                    indeterminate: false,
+                });
                 throw error;
             }
         }
 
         callbacks.onLog(`\n✅ Plan execution finished successfully.`);
+        callbacks.onProgress({
+            stepId: null,
+            stepLabel: "Completed",
+            message: "All plan steps finished successfully.",
+            percent: 100,
+            indeterminate: false,
+        });
     }
 
     private static async simulateExecution(
@@ -113,6 +157,13 @@ export class ExecutionEngine {
                 return cleanData;
 
             case "EXTRACT_PDF":
+                callbacks.onProgress({
+                    stepId: step.id,
+                    stepLabel: step.label,
+                    message: "Preparing atomic PDF extraction pipeline...",
+                    percent: 8,
+                    indeterminate: true,
+                });
                 callbacks.onLog("Initializing PyMuPDF / VDU Pipeline Engine...");
                 const targetFilePath = step.metadata?.filePath;
                 if (!targetFilePath) {
@@ -128,10 +179,24 @@ export class ExecutionEngine {
                     callbacks.onLog("[TableMaster] Initialized formula and tabular extractors.");
                 }
 
+                callbacks.onProgress({
+                    stepId: step.id,
+                    stepLabel: step.label,
+                    message: "Reading source PDF and dispatching extraction job...",
+                    percent: 18,
+                    indeterminate: true,
+                });
                 callbacks.onLog(`Dispatching Ray Tasks for local file: ${targetFilePath}`);
                 await this.delay(600);
                 
                 // Attempt to call Next.js Local API
+                callbacks.onProgress({
+                    stepId: step.id,
+                    stepLabel: step.label,
+                    message: "Running layout parsing, patching, and asset export. This can take a little while...",
+                    percent: 42,
+                    indeterminate: true,
+                });
                 const resp = await fetch("/api/extract-pdf", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -144,6 +209,13 @@ export class ExecutionEngine {
                 }
 
                 const pdfData = await resp.json();
+                callbacks.onProgress({
+                    stepId: step.id,
+                    stepLabel: step.label,
+                    message: "Rendering patched preview and assembling markdown result...",
+                    percent: 78,
+                    indeterminate: true,
+                });
                 
                 callbacks.onLog(`✅ Extraction Layout Algorithm Completed! Time: ${pdfData._processing_time_ms}ms.`);
 
@@ -155,6 +227,14 @@ export class ExecutionEngine {
                 if(addScannedWarn) {
                    callbacks.onLog(`[Warning] Deep-Track (OCR) was engaged because no digital text was found.`);
                 }
+
+                callbacks.onProgress({
+                    stepId: step.id,
+                    stepLabel: step.label,
+                    message: "PDF extraction artifacts are ready.",
+                    percent: 92,
+                    indeterminate: false,
+                });
                 
                 return [{ 
                     _is_pdf_result: true, 

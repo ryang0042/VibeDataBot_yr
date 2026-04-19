@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 export function ChatInterface() {
     const { 
         status, setStatus, addMessage, setPlan, plan, 
-        updateStepStatus, addLog, updateArtifact,
+        updateStepStatus, addLog, updateArtifact, setExecutionProgress,
         chatInput: input, setChatInput: setInput 
     } = useAgent();
 
@@ -20,6 +20,7 @@ export function ChatInterface() {
 
         const userMsg = input;
         setInput("");
+        setExecutionProgress(null);
 
         // 1. Add User Message
         addMessage({
@@ -71,7 +72,8 @@ export function ChatInterface() {
                     updateStepStatus(stepId, mappedStatus);
                 },
                 onLog: (log) => addLog(log),
-                onArtifact: (stepId, data) => updateArtifact(stepId, data)
+                onArtifact: (stepId, data) => updateArtifact(stepId, data),
+                onProgress: (progress) => setExecutionProgress(progress),
             });
 
             setStatus("DONE");
@@ -81,7 +83,10 @@ export function ChatInterface() {
                 content: "Plan execution completed successfully.",
                 timestamp: Date.now()
             });
-            setTimeout(() => setStatus("IDLE"), 3000); // Reset after 3s
+            setTimeout(() => {
+                setStatus("IDLE");
+                setExecutionProgress(null);
+            }, 3000); // Reset after 3s
 
         } catch (e) {
             console.error(e);

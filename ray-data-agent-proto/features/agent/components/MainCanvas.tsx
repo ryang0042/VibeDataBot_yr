@@ -42,7 +42,7 @@ type QualityPreviewArtifact = {
 };
 
 export function MainCanvas() {
-    const { status, logs, messages, selectedResource, plan } = useAgent();
+    const { status, logs, messages, selectedResource, plan, executionProgress } = useAgent();
     const bottomRef = useRef<HTMLDivElement>(null);
     const [activePreview, setActivePreview] = useState<string | null>(null);
 
@@ -98,6 +98,53 @@ export function MainCanvas() {
                                     Active Execution Plan
                                 </div>
                                 <PipelineVisualizer onNodeClick={setActivePreview} />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <AnimatePresence>
+                        {status === "EXECUTING" && executionProgress && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 12 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -8 }}
+                                className="rounded-xl border border-primary/20 bg-card/70 backdrop-blur-md p-4 shadow-lg"
+                            >
+                                <div className="flex items-center justify-between gap-4 mb-3">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-semibold text-foreground">
+                                            {executionProgress.stepLabel || "Working"}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {executionProgress.message}
+                                        </span>
+                                    </div>
+                                    <div className="text-sm font-mono text-primary">
+                                        {Math.max(0, Math.min(100, executionProgress.percent))}%
+                                    </div>
+                                </div>
+
+                                <div className="h-2 rounded-full bg-muted/70 overflow-hidden">
+                                    <motion.div
+                                        className="h-full bg-gradient-to-r from-primary via-sky-400 to-cyan-300"
+                                        initial={false}
+                                        animate={
+                                            executionProgress.indeterminate
+                                                ? { x: ["-40%", "120%"] }
+                                                : { width: `${Math.max(6, executionProgress.percent)}%`, x: "0%" }
+                                        }
+                                        transition={
+                                            executionProgress.indeterminate
+                                                ? { repeat: Infinity, duration: 1.4, ease: "easeInOut" }
+                                                : { duration: 0.35, ease: "easeOut" }
+                                        }
+                                        style={
+                                            executionProgress.indeterminate
+                                                ? { width: "35%" }
+                                                : { width: `${Math.max(6, executionProgress.percent)}%` }
+                                        }
+                                    />
+                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>

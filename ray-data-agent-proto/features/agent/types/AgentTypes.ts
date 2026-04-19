@@ -31,6 +31,14 @@ export interface ExecutionPlan {
     artifacts?: Record<string, unknown[]>; // stepId -> data rows
 }
 
+export interface ExecutionProgress {
+    stepId: string | null;
+    stepLabel: string;
+    message: string;
+    percent: number;
+    indeterminate?: boolean;
+}
+
 export interface AgentMessage {
     id: string;
     sender: "user" | "agent";
