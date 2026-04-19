@@ -24,6 +24,10 @@ def _default_output_root() -> Path:
     return _project_root() / "runtime" / "pdf_extractor_outputs"
 
 
+def _path_to_file_url(target_path: Path) -> str:
+    return target_path.resolve().as_uri()
+
+
 def _job_dir_name(pdf_path: Path) -> str:
     signature = hashlib.sha1(str(pdf_path).encode("utf-8")).hexdigest()[:10]
     return f"{pdf_path.stem}_{signature}"
@@ -96,8 +100,8 @@ def build_pdf_pipeline(
 
     return {
         "doc_id": pdf_path.name,
-        "source_url": f"local://{pdf_path}",
-        "preview_url": f"local://{final_visual}",
+        "source_url": _path_to_file_url(pdf_path),
+        "preview_url": _path_to_file_url(final_visual),
         "markdown_content": payload.get("markdown_content", ""),
         "plain_text_content": plain_text_content,
         "metadata": {

@@ -2,6 +2,40 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
+function normalizeIncomingPath(filePath: string) {
+    let cleanPath = filePath.trim();
+
+    if (cleanPath.startsWith("file://")) {
+        try {
+            const url = new URL(cleanPath);
+            let pathname = decodeURIComponent(url.pathname);
+
+            if (process.platform === "win32") {
+                if (pathname.startsWith("/") && /^[A-Za-z]:/.test(pathname.slice(1))) {
+                    pathname = pathname.slice(1);
+                }
+                pathname = pathname.replace(/\//g, "\\");
+            }
+
+            return pathname;
+        } catch {
+            cleanPath = cleanPath.replace(/^file:\/\//, "");
+        }
+    }
+
+    if (cleanPath.startsWith("local://")) {
+        cleanPath = cleanPath.replace(/^local:\/\//, "");
+    } else if (cleanPath.startsWith("local:")) {
+        cleanPath = cleanPath.replace(/^local:/, "");
+    }
+
+    if (process.platform === "win32" && cleanPath.startsWith("/") && /^[A-Za-z]:/.test(cleanPath.slice(1))) {
+        cleanPath = cleanPath.slice(1);
+    }
+
+    return cleanPath;
+}
+
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const filePath = searchParams.get("path");
@@ -10,12 +44,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Missing 'path' parameter" }, { status: 400 });
     }
 
-    // Sanitize pseudo protocols often attached by Ray or FileTrees
-    let cleanPath = filePath;
-    if (cleanPath.startsWith("local:")) cleanPath = cleanPath.replace("local:", "");
-    if (cleanPath.startsWith("file://")) cleanPath = cleanPath.replace("file://", "");
-
     try {
+        const cleanPath = normalizeIncomingPath(filePath);
         const resolvedPath = path.resolve(cleanPath);
 
         // Security check: ensure the file exists and is a file
@@ -45,10 +75,11 @@ export async function GET(request: NextRequest) {
                 "Content-Disposition": `inline; filename="${path.basename(resolvedPath)}"`,
             },
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Local File Proxy Error:", error);
+        const details = error instanceof Error ? error.message : String(error);
         return NextResponse.json(
-            { error: "Failed to read file", details: error.message },
+            { error: "Failed to read file", details },
             { status: 500 }
         );
     }

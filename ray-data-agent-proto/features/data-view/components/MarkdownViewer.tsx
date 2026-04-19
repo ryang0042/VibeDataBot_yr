@@ -29,14 +29,12 @@ type ParsedBlock =
           caption?: string;
       };
 
-function normalizeLocalPath(filePath: string) {
-    if (filePath.startsWith("local:")) {
-        return filePath.replace(/^local:/, "");
-    }
-    if (filePath.startsWith("file://")) {
-        return filePath.replace(/^file:\/\//, "");
-    }
-    return filePath;
+function joinFileSystemPath(basePath: string, relativePath: string) {
+    const usesBackslash = basePath.includes("\\");
+    const separator = usesBackslash ? "\\" : "/";
+    const normalizedBase = basePath.replace(/[\\/]+$/, "");
+    const normalizedRelative = relativePath.replace(/^[\\/]+/, "").replace(/[\\/]/g, separator);
+    return `${normalizedBase}${separator}${normalizedRelative}`;
 }
 
 function resolveArtifactPath(rawPath: string | undefined, outputDir: string | undefined) {
@@ -44,22 +42,22 @@ function resolveArtifactPath(rawPath: string | undefined, outputDir: string | un
         return "";
     }
 
-    if (rawPath.startsWith("/") || rawPath.startsWith("local:") || rawPath.startsWith("file://")) {
-        return normalizeLocalPath(rawPath);
+    if (rawPath.startsWith("/") || rawPath.startsWith("local:") || rawPath.startsWith("file://") || /^[A-Za-z]:[\\/]/.test(rawPath)) {
+        return rawPath;
     }
 
     if (!outputDir) {
         return rawPath;
     }
 
-    return `${outputDir.replace(/\/$/, "")}/${rawPath.replace(/^\.\//, "")}`;
+    return joinFileSystemPath(outputDir, rawPath.replace(/^\.\//, ""));
 }
 
 function buildProxyUrl(filePath: string) {
     if (!filePath) {
         return "";
     }
-    return `/api/file?path=${encodeURIComponent(normalizeLocalPath(filePath))}`;
+    return `/api/file?path=${encodeURIComponent(filePath)}`;
 }
 
 function parseAssetFence(lines: string[], startIndex: number) {

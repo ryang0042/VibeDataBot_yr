@@ -9,6 +9,20 @@ const execFileAsync = promisify(execFile);
 
 type OutputProfile = "compact" | "standard" | "full";
 
+function getPythonCommand() {
+    if (process.env.PYTHON_BIN) {
+        return process.env.PYTHON_BIN;
+    }
+
+    if (process.env.VIRTUAL_ENV) {
+        return process.platform === "win32"
+            ? path.join(process.env.VIRTUAL_ENV, "Scripts", "python.exe")
+            : path.join(process.env.VIRTUAL_ENV, "bin", "python");
+    }
+
+    return "python";
+}
+
 export async function POST(req: NextRequest) {
     let tempDir: string | null = null;
 
@@ -39,9 +53,7 @@ export async function POST(req: NextRequest) {
         }
 
         const rootDir = process.cwd();
-        const pythonCommand =
-            process.env.PYTHON_BIN ||
-            (process.env.VIRTUAL_ENV ? path.join(process.env.VIRTUAL_ENV, "bin/python") : "python");
+        const pythonCommand = getPythonCommand();
         const args: string[] = [
             "-m",
             "atomic_ability_evaluate.cli",

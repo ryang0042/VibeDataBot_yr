@@ -5,6 +5,20 @@ import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
 
+function getPythonCommand() {
+    if (process.env.PYTHON_BIN) {
+        return process.env.PYTHON_BIN;
+    }
+
+    if (process.env.VIRTUAL_ENV) {
+        return process.platform === "win32"
+            ? path.join(process.env.VIRTUAL_ENV, "Scripts", "python.exe")
+            : path.join(process.env.VIRTUAL_ENV, "bin", "python");
+    }
+
+    return "python";
+}
+
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
@@ -18,9 +32,7 @@ export async function POST(req: NextRequest) {
         }
 
         const rootDir = process.cwd();
-        const pythonCommand =
-            process.env.PYTHON_BIN ||
-            (process.env.VIRTUAL_ENV ? path.join(process.env.VIRTUAL_ENV, "bin/python") : "python");
+        const pythonCommand = getPythonCommand();
 
         const args = ["-m", "atomic_ability_pdf_extractor.cli", "--file-path", filePath];
         if (keepIntermediates) {

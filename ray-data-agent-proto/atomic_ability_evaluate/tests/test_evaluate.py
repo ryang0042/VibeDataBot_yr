@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from atomic_ability_evaluate.evaluate import (
     METRIC_ORDER,
@@ -49,11 +50,8 @@ class EvaluateTests(unittest.TestCase):
         self.assertNotIn("chunk_metrics", result[0])
 
     def test_pdf_loading_and_evaluation(self) -> None:
-        pdf_path = (
-            "/Users/r.yang/Desktop/York_Document/260418_VibeDataBot_ChatGPT/"
-            "atomic_ability_evaluate/tests/test_data.pdf"
-        )
-        records = load_records_from_path(pdf_path)
+        pdf_path = Path(__file__).resolve().parent / "test_data.pdf"
+        records = load_records_from_path(str(pdf_path))
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["meta"]["source_type"], "pdf_text")
         result = evaluate_record(records[0], output_profile="full")
