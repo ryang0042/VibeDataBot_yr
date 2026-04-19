@@ -12,8 +12,10 @@ import { TerminalSquare, Loader2, Bot } from "lucide-react";
 type PdfPreviewArtifact = {
     _is_pdf_result: true;
     markdown_content: string;
+    plain_text_content?: string;
     metadata: Record<string, unknown>;
     source_url: string;
+    preview_url?: string;
 };
 
 type QualityPreviewArtifact = {

@@ -16,6 +16,8 @@
 # next.js
 /.next/
 /out/
+/runtime/pdf_extractor_outputs/*
+!/runtime/pdf_extractor_outputs/.gitkeep
 
 # production
 /build

@@ -4,8 +4,10 @@ import { MockDataService } from "../../data-view/logic/MockDataService";
 type PdfArtifact = {
     _is_pdf_result: true;
     markdown_content: string;
+    plain_text_content?: string;
     metadata?: Record<string, unknown>;
     source_url?: string;
+    preview_url?: string;
     doc_id?: string;
 };
 
@@ -144,21 +146,11 @@ export class ExecutionEngine {
                 const pdfData = await resp.json();
                 
                 callbacks.onLog(`✅ Extraction Layout Algorithm Completed! Time: ${pdfData._processing_time_ms}ms.`);
-                
-                let outMarkdown = pdfData.markdown_content as string;
-                let addScannedWarn = pdfData._is_scanned_pdf;
 
-                if (isAdvancedLayout) {
-                    callbacks.onLog(`[Layout Analyser] Stripped 3 Headers and 2 Footnotes.`);
-                    callbacks.onLog(`[FormulaEngine] Detected and transformed 4 equations into LaTeX.`);
-                    callbacks.onLog(`[TableEngine] Converted 1 tabular region into HTML <table>.`);
-                    await this.delay(500);
-
-                    // 强行插入一段极其复杂的版面模拟，为了展现给用户对比震撼度
-                    const complexMock = `\n\n### 3. Methodology: Quantum Formulars\n\nWe define the energy state of the system as an integral over the topological surface, parsed by our VDU engine:\n\n$$ E(\psi) = \int_{\Omega} \left( \frac{1}{2} |\nabla \psi|^2 + V(x)|\psi|^2 \right) dx + \sum_{i=1}^{N} \lambda_i (x_i) $$\n\nWhere $V(x)$ is the potential energy matrix.\n\n### Financial Outcomes Overview\n\n<table border="1">\n  <tr>\n    <th>Quarter</th>\n    <th>Revenue (M)</th>\n    <th>Loss (M)</th>\n  </tr>\n  <tr>\n    <td>Q1</td>\n    <td>$12,400.00</td>\n    <td>- $300.00</td>\n  </tr>\n</table>\n\n*Extracted purely via PDF-Extract-Kit layout pipeline.*`;
-                    outMarkdown = outMarkdown + complexMock;
-                    addScannedWarn = false; // Advanced layout uses visual features anyway
-                }
+                const outMarkdown = pdfData.markdown_content as string;
+                const plainTextContent =
+                    (pdfData.plain_text_content as string | undefined) ?? (pdfData.markdown_content as string);
+                const addScannedWarn = pdfData._is_scanned_pdf;
 
                 if(addScannedWarn) {
                    callbacks.onLog(`[Warning] Deep-Track (OCR) was engaged because no digital text was found.`);
@@ -167,12 +159,16 @@ export class ExecutionEngine {
                 return [{ 
                     _is_pdf_result: true, 
                     markdown_content: outMarkdown, 
+                    plain_text_content: plainTextContent,
                     metadata: {
                         ...pdfData.metadata,
                         _is_scanned_pdf: pdfData._is_scanned_pdf,
-                        used_extract_kit: isAdvancedLayout ? true : false
+                        used_extract_kit: pdfData.metadata?.used_extract_kit ?? isAdvancedLayout ?? false,
+                        _processing_time_ms: pdfData._processing_time_ms,
                     },
-                    source_url: pdfData.source_url || targetFilePath
+                    source_url: pdfData.source_url || targetFilePath,
+                    preview_url: pdfData.preview_url || pdfData.source_url || targetFilePath,
+                    doc_id: pdfData.doc_id,
                 }];
 
             case "CLEAN_TEXT":
@@ -185,7 +181,7 @@ export class ExecutionEngine {
                     throw new Error("No upstream Markdown content found. Please extract PDF first.");
                 }
 
-                const originalText = lastPdfEntry.markdown_content as string;
+                const originalText = this.getArtifactText(lastPdfEntry);
                 callbacks.onLog(`Input text size: ${originalText.length} characters.`);
                 
                 await this.delay(1500);
@@ -202,6 +198,7 @@ export class ExecutionEngine {
                 return [{
                     ...lastPdfEntry,
                     markdown_content: cleanedText,
+                    plain_text_content: cleanedText,
                     metadata: {
                         ...lastPdfEntry.metadata,
                         cleaned: true,
@@ -220,8 +217,8 @@ export class ExecutionEngine {
                     throw new Error("No upstream Markdown content found to deduplicate.");
                 }
 
-                const sourceText = upstreamNode.markdown_content as string;
-                const paragraphs = sourceText.split('\\n\\n');
+                const sourceText = this.getArtifactText(upstreamNode);
+                const paragraphs = this.splitIntoBlocks(sourceText);
                 callbacks.onLog(`Total blocks analyzed: ${paragraphs.length}`);
                 
                 await this.delay(1500);
@@ -251,6 +248,7 @@ export class ExecutionEngine {
                 return [{
                     ...upstreamNode,
                     markdown_content: dedupedBlocks.join('\\n\\n'),
+                    plain_text_content: dedupedBlocks.join('\\n\\n'),
                     metadata: {
                         ...upstreamNode.metadata,
                         deduplicated: true,
@@ -272,7 +270,7 @@ export class ExecutionEngine {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        text: upstreamForQuality.markdown_content,
+                        text: this.getArtifactText(upstreamForQuality),
                         sourceType,
                         extractMode,
                         outputProfile: "standard",
@@ -310,7 +308,7 @@ export class ExecutionEngine {
                     _is_quality_result: true,
                     evaluation: qualityData,
                     source_url: upstreamForQuality.source_url,
-                    document_preview: this.truncateText(upstreamForQuality.markdown_content as string, 1200),
+                    document_preview: this.truncateText(this.getArtifactText(upstreamForQuality), 1200),
                     metadata: {
                         page_count: upstreamForQuality.metadata?.page_count,
                         source_type: sourceType,
@@ -336,11 +334,11 @@ export class ExecutionEngine {
                     );
                 }
 
-                const fullText = upstreamForCorpus.markdown_content as string;
+                const fullText = this.getArtifactText(upstreamForCorpus);
                 callbacks.onLog("Splitting by logical paragraphs to preserve semantic borders...");
                 await this.delay(1500);
 
-                const finalParagraphs = fullText.split('\\n\\n').filter(p => p.trim().length > 0);
+                const finalParagraphs = this.splitIntoBlocks(fullText);
                 const chunks = [];
                 let currentChunk = "";
                 // 模拟一个极其简单的 1000 字符切片（在真实中会走 tokenizer计算 token数）
@@ -401,6 +399,21 @@ export class ExecutionEngine {
             return text;
         }
         return `${text.slice(0, maxLength).trimEnd()}...`;
+    }
+
+    private static getArtifactText(artifact: PdfArtifact) {
+        const plain = typeof artifact.plain_text_content === "string" ? artifact.plain_text_content : "";
+        if (plain.trim()) {
+            return plain;
+        }
+        return artifact.markdown_content;
+    }
+
+    private static splitIntoBlocks(text: string) {
+        return text
+            .split(/\n\s*\n/g)
+            .map((block) => block.trim())
+            .filter((block) => block.length > 0);
     }
 
     private static isPdfArtifact(artifact: ExecutionArtifact): artifact is PdfArtifact {
