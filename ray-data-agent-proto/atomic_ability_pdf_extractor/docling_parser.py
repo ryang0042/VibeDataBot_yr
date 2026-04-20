@@ -3,12 +3,14 @@ import json
 import fitz  # PyMuPDF
 from pathlib import Path
 
-# --- 网络与性能锁（必须放在最前面） ---
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["HF_HUB_OFFLINE"] = "1"
-os.environ["OMP_NUM_THREADS"] = "6"
-os.environ["OPENBLAS_NUM_THREADS"] = "6"
-os.environ["MKL_NUM_THREADS"] = "6"
+# --- 网络与性能环境（必须放在最前面） ---
+# 不要默认强制离线，否则新设备首次运行时无法拉取 Docling 依赖。
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+if os.environ.get("VIBEDATABOT_HF_OFFLINE") == "1":
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "6")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "6")
+os.environ.setdefault("MKL_NUM_THREADS", "6")
 
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions

@@ -65,8 +65,19 @@ export async function POST(req: NextRequest) {
 }
 
 function getErrorMessage(error: unknown) {
+    if (isExecFileError(error)) {
+        const stderr = error.stderr?.trim();
+        if (stderr) {
+            return `${error.message}\n${stderr}`;
+        }
+    }
+
     if (error instanceof Error) {
         return error.message;
     }
     return String(error);
+}
+
+function isExecFileError(error: unknown): error is Error & { stderr?: string } {
+    return error instanceof Error && "stderr" in error;
 }

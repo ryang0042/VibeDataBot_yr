@@ -227,7 +227,7 @@ output_data/
 `docling_parser.py` 内部默认设置了以下环境变量：
 
 - `HF_ENDPOINT=https://hf-mirror.com`
-- `HF_HUB_OFFLINE=1`
+- 如需强制离线运行，可显式设置 `VIBEDATABOT_HF_OFFLINE=1`
 - `OMP_NUM_THREADS=6`
 - `OPENBLAS_NUM_THREADS=6`
 - `MKL_NUM_THREADS=6`
